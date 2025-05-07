@@ -227,7 +227,7 @@
     {
         if (_paisesConMasDepartamentos.Any())
         {
-            await JS.InvokeVoidAsync("crearGrafico",
+            await JS.InvokeVoidAsync("initializeCharts.createChart",
                 "paisesChart",
                 "bar",
                 _paisesConMasDepartamentos.Select(p => p.Nombre).ToArray(),
@@ -241,7 +241,7 @@
     {
         if (_departamentosConMasCiudades.Any())
         {
-            await JS.InvokeVoidAsync("crearGrafico",
+            await JS.InvokeVoidAsync("initializeCharts.createChart",
                 "departamentosChart",
                 "bar",
                 _departamentosConMasCiudades.Select(d => d.Nombre).ToArray(),
