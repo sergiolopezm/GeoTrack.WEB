@@ -22,6 +22,22 @@
 
     <!-- Blazor WebAssembly -->
     <link href="GeoTrack.WEB.styles.css" rel="stylesheet" />
+
+    <script>
+        window.onError = function (message, source, lineno, colno, error) {
+            console.error('Error: ', error);
+            document.getElementById('error-details').innerText =
+                `Error: ${message}\nEn: ${source}:${lineno}:${colno}\n${error ? error.stack : ''}`;
+            document.getElementById('custom-error-ui').style.display = 'block';
+            return true;
+        };
+        window.addEventListener('error', window.onError);
+    </script>
+
+    <div id="custom-error-ui" style="display:none; position: fixed; bottom: 0; left: 0; right: 0; background-color: #f8d7da; color: #721c24; padding: 10px; text-align: center; z-index: 1000; max-height: 200px; overflow: auto;">
+        <pre id="error-details" style="text-align: left; margin: 0;"></pre>
+        <button onclick="this.parentNode.style.display='none'" style="position: absolute; right: 10px; top: 10px; background: none; border: none; font-weight: bold; cursor: pointer;">X</button>
+    </div>
 </head>
 
 <body>

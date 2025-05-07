@@ -14,5 +14,6 @@ namespace GeoTrack.WEB.Services.Interface
         Task<bool> LogoutAsync();
         Task<UsuarioPerfilDto?> ObtenerUsuarioActual();
         bool EstaAutenticado();
+        Task<bool> EstaAutenticadoAsync();
     }
 }

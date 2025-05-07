@@ -1,4 +1,5 @@
 ﻿@page "/auth/login"
+@using GeoTrack.WEB.Services.Api
 @using GeoTrack.WEB.Services.Interface
 @using GeoTrack.WEB.Models.Auth
 @using Microsoft.AspNetCore.Authorization
@@ -19,7 +20,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="password" class="form-label">Contra<Login />seña</label>
+            <label for="password" class="form-label">Contraseña</label>
             <div class="input-group">
                 <InputText type="@(_mostrarContraseña ? "text" : "password")" id="password" @bind-Value="loginModel.Contraseña" class="form-control" placeholder="Ingrese su contraseña" />
                 <button class="btn btn-outline-secondary" type="button" @onclick="ToggleMostrarContraseña">
@@ -52,7 +53,7 @@
         </div>
     }
 
-    // Agrega esto al HTML después del mensaje de error existente:
+    @* Agrega esto al HTML después del mensaje de error existente: *@
     @if (!string.IsNullOrEmpty(_errorDetallado))
     {
         <div class="alert alert-secondary mt-2 small">
@@ -70,10 +71,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Si el usuario ya está autenticado, redireccionar al dashboard
-        if (AuthService.EstaAutenticado())
+        try
         {
-            NavigationManager.NavigateTo("/dashboard");
+            // Usar la versión asíncrona
+            bool estaAutenticado = await AuthService.EstaAutenticadoAsync();
+            if (estaAutenticado)
+            {
+                NavigationManager.NavigateTo("/dashboard");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error en Login.OnInitializedAsync: {ex.Message}");
+            // No redirigir si hay un error, simplemente mostrar la página de login
         }
     }
 

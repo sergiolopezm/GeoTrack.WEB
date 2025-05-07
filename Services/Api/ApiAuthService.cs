@@ -40,34 +40,25 @@ namespace GeoTrack.WEB.Services.Api
         {
             try
             {
-                // Agregar headers para acceso a la API
-                //_httpClient.DefaultRequestHeaders.Clear();
-                //_httpClient.DefaultRequestHeaders.Add("Sitio", "GeoTrack");
-                //_httpClient.DefaultRequestHeaders.Add("Clave", "GeoTrack2025");
-
-                // Agregar headers para ayudar con CORS
-                _httpClient.DefaultRequestHeaders.Add("Origin", "https://localhost:7295");
-                _httpClient.DefaultRequestHeaders.Add("Access-Control-Request-Method", "POST");
-                _httpClient.DefaultRequestHeaders.Add("Access-Control-Request-Headers", "content-type");
+                
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 
                 var content = new StringContent(JsonSerializer.Serialize(loginDto), Encoding.UTF8, "application/json");
 
-                // Registrar información de la solicitud
                 _logger.LogInformation($"Enviando solicitud login a: {_httpClient.BaseAddress}Auth/login");
 
-                // Usar HttpCompletionOption.ResponseHeadersRead para obtener la respuesta más rápido
-                var response = await _httpClient.PostAsync("Auth/login", content, HttpCompletionOption.ResponseHeadersRead);
+                var response = await _httpClient.PostAsync("Auth/login", content, cts.Token);
 
                 if (response.IsSuccessStatusCode)
                 {
                     try
                     {
-                        // Primero lee el contenido como string para depuración
                         var jsonContent = await response.Content.ReadAsStringAsync();
                         _logger.LogInformation("Respuesta JSON: {Json}", jsonContent);
 
                         var resultado = await response.Content.ReadFromJsonAsync<RespuestaDto>(_jsonOptions);
 
+                        // INSERTAR AQUÍ EL CÓDIGO
                         if (resultado != null && resultado.Exito && resultado.Resultado != null)
                         {
                             // Usar JsonSerializer directamente con el objeto resultado.Resultado
@@ -82,10 +73,11 @@ namespace GeoTrack.WEB.Services.Api
                                     await _localStorage.SetItemAsync("usuarioId", authData.Usuario.Id);
                                     await _localStorage.SetItemAsync("usuario", JsonSerializer.Serialize(authData.Usuario));
 
-                                    // Notificar al estado de autenticación
+                                    // Asegúrate de que esta línea esté funcionando correctamente
                                     ((JwtAuthenticationStateProvider)_authStateProvider).NotificarLogin(authData.Token);
 
-                                    return resultado;
+                                    // Podrías agregar un log aquí para verificar
+                                    _logger.LogInformation("Estado de autenticación actualizado correctamente.");
                                 }
                             }
                         }
@@ -100,19 +92,42 @@ namespace GeoTrack.WEB.Services.Api
                 }
                 else
                 {
-                    var errorContent = await response.Content.ReadFromJsonAsync<RespuestaDto>(_jsonOptions);
-                    return errorContent ?? new RespuestaDto
+                    // ESTA ES LA PARTE MODIFICADA - Ahora leemos el texto primero
+                    string errorText = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Error del servidor: {StatusCode}, Contenido: {Content}",
+                                     response.StatusCode, errorText);
+
+                    // Intentamos deserializar como JSON solo si el contenido parece ser JSON
+                    if (errorText.StartsWith("{") || errorText.StartsWith("["))
+                    {
+                        try
+                        {
+                            var errorDto = JsonSerializer.Deserialize<RespuestaDto>(errorText, _jsonOptions);
+                            return errorDto ?? new RespuestaDto
+                            {
+                                Exito = false,
+                                Mensaje = "Error de autenticación",
+                                Detalle = $"Código de error HTTP: {response.StatusCode}"
+                            };
+                        }
+                        catch
+                        {
+                            // Si falla la deserialización, usamos el texto directamente
+                        }
+                    }
+
+                    // Si no es JSON o falló la deserialización, retornamos un error con el texto
+                    return new RespuestaDto
                     {
                         Exito = false,
                         Mensaje = "Error de autenticación",
-                        Detalle = $"Código de error HTTP: {response.StatusCode}"
+                        Detalle = $"Código de error HTTP: {response.StatusCode}. Detalle: {errorText}"
                     };
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error en login: {Message}, StackTrace: {StackTrace}",
-                    ex.Message, ex.StackTrace);
+                _logger.LogError(ex, "Error en login: {Message}", ex.Message);
                 return RespuestaDto.Desde(ex);
             }
         }
@@ -309,10 +324,25 @@ namespace GeoTrack.WEB.Services.Api
         /// <summary>
         /// Verifica si el usuario está autenticado
         /// </summary>
+        public async Task<bool> EstaAutenticadoAsync()
+        {
+            var token = await _localStorage.GetItemAsync<string>("authToken");
+            return !string.IsNullOrEmpty(token);
+        }
+
         public bool EstaAutenticado()
         {
-            var token = _localStorage.GetItemAsync<string>("authToken").Result;
-            return !string.IsNullOrEmpty(token);
+            try
+            {
+                // Comprobación sincrónica sin bloqueo
+                var token = _localStorage.GetItemAsync<string>("authToken")
+                    .ConfigureAwait(false).GetAwaiter().GetResult();
+                return !string.IsNullOrEmpty(token);
+            }
+            catch
+            {
+                return false; // En caso de error, asumimos que no está autenticado
+            }
         }
 
         /// <summary>

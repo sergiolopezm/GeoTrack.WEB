@@ -176,7 +176,10 @@
     {
         if (firstRender && !_cargando)
         {
+            // Agregamos un pequeño retraso para asegurar que el DOM esté completamente cargado
+            await Task.Delay(100);
             await CrearGraficos();
+            StateHasChanged(); // Forzar una actualización de la UI
         }
     }
 
@@ -225,8 +228,9 @@
 
     private async Task CrearGraficoPaises()
     {
-        if (_paisesConMasDepartamentos.Any())
+        if (_paisesConMasDepartamentos != null && _paisesConMasDepartamentos.Any())
         {
+            Console.WriteLine($"Creando gráfico de países con {_paisesConMasDepartamentos.Count} elementos");
             await JS.InvokeVoidAsync("initializeCharts.createChart",
                 "paisesChart",
                 "bar",
@@ -235,19 +239,29 @@
                 "Número de Departamentos",
                 "#3498db");
         }
+        else
+        {
+            Console.WriteLine("No hay datos para crear el gráfico de países");
+        }
     }
 
     private async Task CrearGraficoDepartamentos()
     {
-        if (_departamentosConMasCiudades.Any())
+
+        if (_departamentosConMasCiudades != null && _departamentosConMasCiudades.Any())
         {
+            Console.WriteLine($"Creando gráfico de departamentos con {_departamentosConMasCiudades.Count} elementos");
             await JS.InvokeVoidAsync("initializeCharts.createChart",
                 "departamentosChart",
                 "bar",
                 _departamentosConMasCiudades.Select(d => d.Nombre).ToArray(),
                 _departamentosConMasCiudades.Select(d => d.CiudadesCount).ToArray(),
                 "Número de Ciudades",
-                "#e74c3c");
+                "#2ecc71");
+        }
+        else
+        {
+            Console.WriteLine("No hay datos para crear el gráfico de departamentos");
         }
     }
 
@@ -297,4 +311,3 @@
     }
 </style>
 
-}

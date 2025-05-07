@@ -1,28 +1,12 @@
 ﻿@using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Authorization
 @using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Pages.Auth
 
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
-                @* <NotAuthorized>
-                    @if (context.User.Identity?.IsAuthenticated != true)
-                    {
-                        <RedirectToLogin />
-                    }
-                    else
-                    {
-                        <div class="container mt-5">
-                            <div class="alert alert-danger">
-                                <h4 class="alert-heading">Acceso denegado</h4>
-                                <p>No tiene permisos para acceder a esta página.</p>
-                                <hr>
-                                <p class="mb-0">Por favor, contacte al administrador si cree que esto es un error.</p>
-                            </div>
-                        </div>
-                    }
-                </NotAuthorized> *@
                 <NotAuthorized>
                     <RedirectToLogin />
                 </NotAuthorized>
@@ -55,16 +39,27 @@
     </Router>
 </CascadingAuthenticationState>
 
-@code {
-    public class RedirectToLogin : ComponentBase
-    {
-        [Inject]
-        private NavigationManager NavigationManager { get; set; } = null!;
-
-        protected override void OnInitialized()
-        {
-            NavigationManager.NavigateTo("/auth/login", forceLoad: true);
-
-        }
+<style>
+    .auth-layout {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #f8f9fa;
+        width: 100%;
     }
-}
+
+    .auth-card {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .logo-img {
+        width: 80px;
+        height: 80px;
+    }
+</style>

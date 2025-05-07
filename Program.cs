@@ -6,14 +6,23 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
+// Agregar HttpClient para manejar recursos estáticos
+builder.Services.AddScoped(sp =>
+    new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) }
+);
+
 // ────────────────────────────────────────────────────────────
 // 1)  Cargar configuración y verificar URL base de la API
 // ────────────────────────────────────────────────────────────
+Console.WriteLine($"Base Address: {builder.HostEnvironment.BaseAddress}");
+Console.WriteLine($"Intentando cargar configuración desde: {builder.HostEnvironment.BaseAddress}appsettings.json");
+
 var apiUrl = builder.Configuration.GetValue<string>("ApiSettings:BaseUrl");
 if (string.IsNullOrEmpty(apiUrl))
 {
@@ -32,12 +41,13 @@ if (!apiUrl.EndsWith("/"))
     apiUrl += "/";
 }
 
-// Configurar logging (método correcto para Blazor WebAssembly)
+// Configurar logging avanzado para mejor depuración
 builder.Services.AddLogging(logging =>
 {
     logging.SetMinimumLevel(LogLevel.Information);
-    // En Blazor WebAssembly solo podemos usar ciertos proveedores
-    // No usar AddConfiguration aquí, no es compatible con WebAssembly
+    logging.AddFilter("Microsoft", LogLevel.Warning);
+    logging.AddFilter("System", LogLevel.Warning);
+    logging.AddFilter("GeoTrack.WEB", LogLevel.Debug);
 });
 
 // ────────────────────────────────────────────────────────────
@@ -58,7 +68,14 @@ builder.Services.AddTransient<HttpInterceptor>();
 Action<HttpClient> configureClient = (client) =>
 {
     client.BaseAddress = new Uri(apiUrl);
-    // Agregar cualquier configuración común aquí si es necesario
+    client.Timeout = TimeSpan.FromSeconds(30); // Timeout global para todas las solicitudes
+};
+
+// Agregar manejador de errores global
+AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+{
+    Console.Error.WriteLine($"Error no manejado: {e.ExceptionObject}");
+    Debug.WriteLine($"Error no manejado: {e.ExceptionObject}");
 };
 
 // Configurar clientes tipados con el delegado común
