@@ -1,4 +1,4 @@
-﻿@page "/login"
+﻿@page "/auth/login"
 @using GeoTrack.WEB.Services.Interface
 @using GeoTrack.WEB.Models.Auth
 @using Microsoft.AspNetCore.Authorization
@@ -19,7 +19,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="password" class="form-label">Contraseña</label>
+            <label for="password" class="form-label">Contra<Login />seña</label>
             <div class="input-group">
                 <InputText type="@(_mostrarContraseña ? "text" : "password")" id="password" @bind-Value="loginModel.Contraseña" class="form-control" placeholder="Ingrese su contraseña" />
                 <button class="btn btn-outline-secondary" type="button" @onclick="ToggleMostrarContraseña">

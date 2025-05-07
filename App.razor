@@ -1,11 +1,12 @@
 ﻿@using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Authorization
+@using GeoTrack.WEB.Shared
 
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
-                <NotAuthorized>
+                @* <NotAuthorized>
                     @if (context.User.Identity?.IsAuthenticated != true)
                     {
                         <RedirectToLogin />
@@ -21,6 +22,9 @@
                             </div>
                         </div>
                     }
+                </NotAuthorized> *@
+                <NotAuthorized>
+                    <RedirectToLogin />
                 </NotAuthorized>
                 <Authorizing>
                     <div class="d-flex justify-content-center align-items-center min-vh-100">
@@ -59,7 +63,8 @@
 
         protected override void OnInitialized()
         {
-            NavigationManager.NavigateTo("/login", true);
+            NavigationManager.NavigateTo("/auth/login", forceLoad: true);
+
         }
     }
 }

@@ -1,19 +1,34 @@
 ﻿@page "/"
+@using GeoTrack.WEB.Shared
 @using Microsoft.AspNetCore.Authorization
 @inject NavigationManager NavigationManager
 @attribute [Authorize]
 
+<!-- =========================================================
+     Página de bienvenida GeoTrack
+     Muestra tarjetas de acceso rápido a Países, Departamentos
+     y Ciudades.
+========================================================= -->
+
 <div class="welcome-container">
     <div class="welcome-content text-center">
         <img src="/images/logo.png" alt="GeoTrack Logo" class="welcome-logo mb-4" />
-        <h1 class="display-4 mb-4">Bienvenido a GeoTrack</h1>
-        <p class="lead mb-5">Sistema para la gestión de ubicaciones geográficas</p>
-        
+
+        <h1 class="display-4 mb-1">Bienvenido a GeoTrack</h1>
+        <p class="lead mb-5">
+            Sistema para la gestión de ubicaciones geográficas
+        </p>
+
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="row g-4">
+
+                    <!-- ────────────────────────────────
+                         Tarjeta: Países
+                    ──────────────────────────────── -->
                     <div class="col-md-4">
-                        <div class="card h-100 welcome-card" @onclick="() => NavigationManager.NavigateTo("/paises")">
+                        <div class="card h-100 welcome-card"
+                             @onclick='@(() => NavigationManager.NavigateTo("/paises"))'>
                             <div class="card-body text-center">
                                 <i class="bi bi-globe welcome-icon mb-3"></i>
                                 <h5 class="card-title">Países</h5>
@@ -21,9 +36,13 @@
                             </div>
                         </div>
                     </div>
-                    
+
+                    <!-- ────────────────────────────────
+                         Tarjeta: Departamentos
+                    ──────────────────────────────── -->
                     <div class="col-md-4">
-                        <div class="card h-100 welcome-card" @onclick="() => NavigationManager.NavigateTo("/departamentos")">
+                        <div class="card h-100 welcome-card"
+                             @onclick='@(() => NavigationManager.NavigateTo("/departamentos"))'>
                             <div class="card-body text-center">
                                 <i class="bi bi-map welcome-icon mb-3"></i>
                                 <h5 class="card-title">Departamentos</h5>
@@ -31,9 +50,13 @@
                             </div>
                         </div>
                     </div>
-                    
+
+                    <!-- ────────────────────────────────
+                         Tarjeta: Ciudades
+                    ──────────────────────────────── -->
                     <div class="col-md-4">
-                        <div class="card h-100 welcome-card" @onclick="() => NavigationManager.NavigateTo("/ciudades")">
+                        <div class="card h-100 welcome-card"
+                             @onclick='@(() => NavigationManager.NavigateTo("/ciudades"))'>
                             <div class="card-body text-center">
                                 <i class="bi bi-building welcome-icon mb-3"></i>
                                 <h5 class="card-title">Ciudades</h5>
@@ -41,51 +64,36 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="mt-5">
-            <button class="btn btn-primary btn-lg" @onclick="() => NavigationManager.NavigateTo("/dashboard")">
-                <i class="bi bi-graph-up me-2"></i> Ver Dashboard
-            </button>
-        </div>
-    </div>
-</div>
 
+                </div> <!-- /row g-4 -->
+            </div>     <!-- /col-md-8 -->
+        </div>         <!-- /row justify-content-center -->
+    </div>             <!-- /welcome-content -->
+</div>                 <!-- /welcome-container -->
+
+@* ===========================================================
+   Estilos rápidos (puedes moverlos a un .css si prefieres)
+=========================================================== *@
 <style>
     .welcome-container {
-        min-height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem 0;
+        margin-top: 4rem;
     }
-    
-    .welcome-content {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    
+
     .welcome-logo {
-        width: 120px;
-        height: 120px;
+        max-width: 160px;
     }
-    
-    .welcome-icon {
-        font-size: 2.5rem;
-        color: #3498db;
-    }
-    
+
     .welcome-card {
-        transition: all 0.3s ease;
         cursor: pointer;
-        border: 1px solid rgba(0, 0, 0, 0.125);
+        transition: transform .15s ease-in-out;
     }
-    
-    .welcome-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-        border-color: #3498db;
+
+        .welcome-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+
+    .welcome-icon {
+        font-size: 3rem;
     }
 </style>

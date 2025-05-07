@@ -39,8 +39,8 @@
                 </div>
                 <div class="d-flex flex-wrap align-items-center">
                     <div class="me-2 mb-2 mb-md-0">
-                        <select class="form-select" @bind="PaisId" @onchange="CambiarPais">
-                            <option value="@null">Todos los países</option>
+                        <select class="form-select" @bind="PaisId" @bind:after="CambiarPais">
+                            <option value="">Todos los países</option>
                             @foreach (var pais in Paises)
                             {
                                 <option value="@pais.Id">@pais.Nombre</option>
@@ -48,15 +48,15 @@
                         </select>
                     </div>
                     <div class="me-2 mb-2 mb-md-0">
-                        <select class="form-select" @bind="DepartamentoId" @onchange="FiltrarPorDepartamento">
-                            <option value="@null">Todos los departamentos</option>
+                        <select class="form-select" @bind="DepartamentoId" @bind:after="FiltrarPorDepartamento">
+                            <option value="">Todos los departamentos</option>
                             @foreach (var departamento in Departamentos)
                             {
                                 <option value="@departamento.Id">@departamento.Nombre</option>
                             }
                         </select>
                     </div>
-                    <select class="form-select" @bind="ElementosPorPagina" @onchange="CambiarElementosPorPagina">
+                    <select class="form-select" @bind="ElementosPorPagina" @bind:after="CambiarElementosPorPagina">
                         <option value="5">5 por página</option>
                         <option value="10">10 por página</option>
                         <option value="25">25 por página</option>

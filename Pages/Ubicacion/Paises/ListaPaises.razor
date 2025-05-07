@@ -36,7 +36,7 @@
                     }
                 </div>
                 <div>
-                    <select class="form-select" @bind="ElementosPorPagina" @onchange="CambiarElementosPorPagina">
+                    <select class="form-select" @bind="ElementosPorPagina" @bind:after="CambiarElementosPorPagina">
                         <option value="5">5 por página</option>
                         <option value="10">10 por página</option>
                         <option value="25">25 por página</option>

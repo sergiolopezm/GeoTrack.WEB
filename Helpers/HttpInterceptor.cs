@@ -1,65 +1,65 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 
 namespace GeoTrack.WEB.Helpers
 {
     /// <summary>
-    /// Interceptor para añadir headers de autenticación a las solicitudes HTTP
+    /// Inserta encabezados comunes y redirige al login si la API responde 401.
     /// </summary>
     public class HttpInterceptor : DelegatingHandler
     {
-        private readonly LocalStorageService _localStorage;
-        private readonly ILogger<HttpInterceptor> _logger;
+        private readonly LocalStorageService _storage;
+        private readonly NavigationManager _nav;
+        private readonly ILogger<HttpInterceptor> _log;
 
-        public HttpInterceptor(LocalStorageService localStorage, ILogger<HttpInterceptor> logger)
+        public HttpInterceptor(
+            LocalStorageService storage,
+            NavigationManager nav,
+            ILogger<HttpInterceptor> log)
         {
-            _localStorage = localStorage;
-            _logger = logger;
-            InnerHandler = new HttpClientHandler();
+            _storage = storage;
+            _nav = nav;
+            _log = log;
         }
 
-        /// <summary>
-        /// Intercepta las solicitudes HTTP y añade los headers de autenticación
-        /// </summary>
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
-            await AgregarHeadersAutenticacionAsync(request);
+            await AddHeadersAsync(request);
+            var response = await base.SendAsync(request, cancellationToken);
 
-            try
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                // Llamar al handler interno para continuar con la solicitud
-                return await base.SendAsync(request, cancellationToken);
+                _nav.NavigateTo("/auth/login", forceLoad: true);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error en la solicitud HTTP: {Url}", request.RequestUri);
-                throw;
-            }
+
+            return response;
         }
 
-        /// <summary>
-        /// Agrega los headers de autenticación a la solicitud
-        /// </summary>
-        private async Task AgregarHeadersAutenticacionAsync(HttpRequestMessage request)
+        // ------------------------------------------------------
+        private async Task AddHeadersAsync(HttpRequestMessage request)
         {
             try
             {
-                // Agregar headers para acceso a la API
                 request.Headers.Add("Sitio", "GeoTrack");
                 request.Headers.Add("Clave", "GeoTrack2025");
 
-                // Agregar token JWT si existe
-                var token = await _localStorage.GetItemAsync<string>("authToken");
-                var usuarioId = await _localStorage.GetItemAsync<string>("usuarioId");
+                var token = await _storage.GetItemAsync<string>("authToken");
+                var usuarioId = await _storage.GetItemAsync<string>("usuarioId");
 
-                if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(usuarioId))
-                {
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                if (!string.IsNullOrWhiteSpace(token))
+                    request.Headers.Authorization =
+                        new AuthenticationHeaderValue("Bearer", token);
+
+                if (!string.IsNullOrWhiteSpace(usuarioId))
                     request.Headers.Add("UsuarioId", usuarioId);
-                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al agregar headers de autenticación");
+                _log.LogError(ex, "Error agregando encabezados HTTP");
             }
         }
     }

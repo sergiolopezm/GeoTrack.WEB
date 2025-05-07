@@ -39,7 +39,7 @@
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label for="paisId" class="form-label">País <span class="text-danger">*</span></label>
-                        <select id="paisId" class="form-select" @bind="PaisSeleccionado" @onchange="CambiarPais">
+                        <select id="paisId" class="form-select" @bind="PaisSeleccionado" @bind:after="CambiarPais">
                             <option value="0">Seleccione un país</option>
                             @foreach (var pais in _paises)
                             {

@@ -1,0 +1,9 @@
+﻿@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Ajusta la ruta si tu Login.razor usa otra
+        Nav.NavigateTo("/auth/login", forceLoad: true);
+    }
+}
