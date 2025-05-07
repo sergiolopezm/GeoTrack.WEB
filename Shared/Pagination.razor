@@ -1,0 +1,123 @@
+﻿@if (TotalPaginas > 1)
+{
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="pagination-info">
+            <small class="text-muted">
+                Mostrando @(((PaginaActual - 1) * ElementosPorPagina) + 1) - @(Math.Min(PaginaActual * ElementosPorPagina, TotalRegistros)) de @TotalRegistros registros
+            </small>
+        </div>
+        <nav aria-label="Paginación">
+            <ul class="pagination justify-content-end mb-0">
+                <li class="page-item @(PaginaActual == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(1)" aria-label="Primera">
+                        <span aria-hidden="true">&laquo;</span>
+                    </button>
+                </li>
+                <li class="page-item @(PaginaActual == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(PaginaActual - 1)" aria-label="Anterior">
+                        <span aria-hidden="true">&lsaquo;</span>
+                    </button>
+                </li>
+
+                @foreach (var pagina in ObtenerPaginasAMostrar())
+                {
+                    @if (pagina == 0)
+                    {
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item @(pagina == PaginaActual ? "active" : "")">
+                            <button class="page-link" @onclick="() => CambiarPagina(pagina)">@pagina</button>
+                        </li>
+                    }
+                }
+
+                <li class="page-item @(PaginaActual == TotalPaginas ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(PaginaActual + 1)" aria-label="Siguiente">
+                        <span aria-hidden="true">&rsaquo;</span>
+                    </button>
+                </li>
+                <li class="page-item @(PaginaActual == TotalPaginas ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(TotalPaginas)" aria-label="Última">
+                        <span aria-hidden="true">&raquo;</span>
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int PaginaActual { get; set; } = 1;
+
+    [Parameter]
+    public int TotalPaginas { get; set; } = 1;
+
+    [Parameter]
+    public int TotalRegistros { get; set; } = 0;
+
+    [Parameter]
+    public int ElementosPorPagina { get; set; } = 10;
+
+    [Parameter]
+    public EventCallback<int> OnPageChanged { get; set; }
+
+    private async Task CambiarPagina(int pagina)
+    {
+        if (pagina != PaginaActual && pagina > 0 && pagina <= TotalPaginas)
+        {
+            PaginaActual = pagina;
+            await OnPageChanged.InvokeAsync(pagina);
+        }
+    }
+
+    private List<int> ObtenerPaginasAMostrar()
+    {
+        var paginas = new List<int>();
+
+        if (TotalPaginas <= 7)
+        {
+            // Si hay 7 o menos páginas, mostrar todas
+            for (int i = 1; i <= TotalPaginas; i++)
+            {
+                paginas.Add(i);
+            }
+        }
+        else
+        {
+            // Siempre añadir la primera página
+            paginas.Add(1);
+
+            // Calcular el rango de páginas a mostrar
+            int startPage = Math.Max(2, PaginaActual - 1);
+            int endPage = Math.Min(TotalPaginas - 1, PaginaActual + 1);
+
+            // Añadir puntos suspensivos antes si es necesario
+            if (startPage > 2)
+            {
+                paginas.Add(0); // 0 representa "..."
+            }
+
+            // Añadir las páginas del rango
+            for (int i = startPage; i <= endPage; i++)
+            {
+                paginas.Add(i);
+            }
+
+            // Añadir puntos suspensivos después si es necesario
+            if (endPage < TotalPaginas - 1)
+            {
+                paginas.Add(0); // 0 representa "..."
+            }
+
+            // Siempre añadir la última página
+            paginas.Add(TotalPaginas);
+        }
+
+        return paginas;
+    }
+}

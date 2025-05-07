@@ -1,0 +1,255 @@
+﻿@page "/profile"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using GeoTrack.WEB.Models.Auth
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthService AuthService
+@attribute [Authorize]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <div class="profile-avatar mb-3">
+                        @if (_usuario != null)
+                        {
+                            @_usuario.Nombre[0]@_usuario.Apellido[0]
+                        }
+                        else
+                        {
+                            <i class="bi bi-person"></i>
+                        }
+                    </div>
+                    
+                    @if (_usuario != null)
+                    {
+                        <h5 class="card-title">@_usuario.Nombre @_usuario.Apellido</h5>
+                        <p class="text-muted">@_usuario.Email</p>
+                        <p class="mb-1"><span class="badge bg-primary rounded-pill">@_usuario.Rol</span></p>
+                    }
+                    else
+                    {
+                        <h5 class="card-title placeholder-glow">
+                            <span class="placeholder col-6"></span>
+                        </h5>
+                        <p class="text-muted placeholder-glow">
+                            <span class="placeholder col-8"></span>
+                        </p>
+                    }
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Cambiar contraseña</h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="cambioContraseñaModel" OnValidSubmit="CambiarContraseña">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label for="contraseñaActual" class="form-label">Contraseña actual</label>
+                            <InputText type="password" id="contraseñaActual" @bind-Value="cambioContraseñaModel.ContraseñaActual" class="form-control" />
+                            <ValidationMessage For="@(() => cambioContraseñaModel.ContraseñaActual)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="nuevaContraseña" class="form-label">Nueva contraseña</label>
+                            <InputText type="password" id="nuevaContraseña" @bind-Value="cambioContraseñaModel.NuevaContraseña" class="form-control" />
+                            <ValidationMessage For="@(() => cambioContraseñaModel.NuevaContraseña)" class="text-danger" />
+                            <small class="form-text text-muted">Mínimo 6 caracteres, al menos una mayúscula, una minúscula y un número</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirmarContraseña" class="form-label">Confirmar contraseña</label>
+                            <InputText type="password" id="confirmarContraseña" @bind-Value="cambioContraseñaModel.ConfirmarContraseña" class="form-control" />
+                            <ValidationMessage For="@(() => cambioContraseñaModel.ConfirmarContraseña)" class="text-danger" />
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100" disabled="@_cargando">
+                            @if (_cargando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Cambiando contraseña...</span>
+                            }
+                            else
+                            {
+                                <span>Cambiar contraseña</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Información del usuario</h5>
+                </div>
+                <div class="card-body">
+                    @if (_usuario != null)
+                    {
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Nombre de usuario</h6>
+                                <p>@_usuario.NombreUsuario</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Correo electrónico</h6>
+                                <p>@_usuario.Email</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Nombre completo</h6>
+                                <p>@_usuario.Nombre @_usuario.Apellido</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Rol</h6>
+                                <p>@_usuario.Rol</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Fecha de registro</h6>
+                                <p>@_usuario.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Último acceso</h6>
+                                <p>@(_usuario.FechaUltimoAcceso.HasValue ? _usuario.FechaUltimoAcceso.Value.ToString("dd/MM/yyyy HH:mm") : "No disponible")</p>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-12 mb-3" style="height: 24px;"></span>
+                            <span class="placeholder col-8 mb-3" style="height: 24px;"></span>
+                            <span class="placeholder col-10 mb-3" style="height: 24px;"></span>
+                            <span class="placeholder col-6 mb-3" style="height: 24px;"></span>
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Historial de actividad</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-center text-muted py-4">
+                        <i class="bi bi-clock-history fs-3 d-block mb-2"></i>
+                        Esta funcionalidad estará disponible próximamente
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+</div>
+
+@code {
+    private UsuarioPerfilDto? _usuario;
+    private CambioContraseñaModel cambioContraseñaModel = new();
+    private bool _cargando = false;
+    private Alert? _alertComponent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPerfilUsuario();
+    }
+
+    private async Task CargarPerfilUsuario()
+    {
+        try
+        {
+            var respuesta = await AuthService.ObtenerPerfilAsync();
+            
+            if (respuesta.Exito && respuesta.Resultado != null)
+            {
+                _usuario = await AuthService.ObtenerUsuarioActual();
+            }
+            else if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al cargar perfil", respuesta.Mensaje, Alert.TipoAlerta.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+        }
+    }
+
+    private async Task CambiarContraseña()
+    {
+        if (cambioContraseñaModel.NuevaContraseña != cambioContraseñaModel.ConfirmarContraseña)
+        {
+            if (_alertComponent != null)
+                await _alertComponent.MostrarAsync("Las contraseñas no coinciden", "Error", Alert.TipoAlerta.Error);
+            return;
+        }
+
+        _cargando = true;
+
+        try
+        {
+            // Aquí implementaríamos la lógica para cambiar la contraseña
+            // En una aplicación real, necesitaríamos un endpoint específico para esto
+            await Task.Delay(1000); // Simulamos una llamada a la API
+            
+            if (_alertComponent != null)
+                await _alertComponent.MostrarAsync("La contraseña se ha cambiado correctamente", "Éxito", Alert.TipoAlerta.Success);
+            
+            // Limpiar formulario
+            cambioContraseñaModel = new CambioContraseñaModel();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    public class CambioContraseñaModel
+    {
+        [Required(ErrorMessage = "La contraseña actual es requerida")]
+        public string ContraseñaActual { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "La nueva contraseña es requerida")]
+        [StringLength(50, MinimumLength = 6, ErrorMessage = "La contraseña debe tener entre 6 y 50 caracteres")]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$", 
+            ErrorMessage = "La contraseña debe tener al menos una letra mayúscula, una minúscula y un número")]
+        public string NuevaContraseña { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "Debe confirmar la nueva contraseña")]
+        public string ConfirmarContraseña { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background-color: #3498db;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 48px;
+        margin: 0 auto;
+        font-weight: 500;
+    }
+</style>

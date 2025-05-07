@@ -1,0 +1,277 @@
+﻿@page "/departamentos"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using Microsoft.AspNetCore.Authorization
+@inject IDepartamentoService DepartamentoService
+@inject IPaisService PaisService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Gestión de Departamentos</h3>
+        <div>
+            <button class="btn btn-primary" @onclick="CrearNuevo">
+                <i class="bi bi-plus-circle me-1"></i> Crear Departamento
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center">
+                <div class="d-flex align-items-center mb-2 mb-md-0">
+                    <div class="input-group" style="width: 300px;">
+                        <input type="text" class="form-control" placeholder="Buscar..." @bind="Busqueda" @bind:event="oninput" @onkeyup="@(e => { if (e.Key == "Enter") BuscarDepartamentos(); })" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="BuscarDepartamentos">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Busqueda))
+                    {
+                        <button class="btn btn-link text-decoration-none" @onclick="LimpiarBusqueda">
+                            <i class="bi bi-x-circle"></i> Limpiar
+                        </button>
+                    }
+                </div>
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <select class="form-select" @bind="PaisId" @onchange="FiltrarPorPais">
+                            <option value="@null">Todos los países</option>
+                            @foreach (var pais in Paises)
+                            {
+                                <option value="@pais.Id">@pais.Nombre</option>
+                            }
+                        </select>
+                    </div>
+                    <select class="form-select" @bind="ElementosPorPagina" @onchange="CambiarElementosPorPagina">
+                        <option value="5">5 por página</option>
+                        <option value="10">10 por página</option>
+                        <option value="25">25 por página</option>
+                        <option value="50">50 por página</option>
+                    </select>
+                </div>
+            </div>
+
+            <TableTemplate TItem="DepartamentoDto" Items="Departamentos" ColumnCount="6" ConPaginacion="true" Paginacion="Paginacion" 
+                          OnRowClick="VerDetalle" OnPageChanged="CambiarPagina" MensajeNoRegistros="No se encontraron departamentos">
+                <TableHeader>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>País</th>
+                    <th>Ciudades</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </TableHeader>
+                <RowTemplate>
+                    <td>@context.Id</td>
+                    <td>@context.Nombre</td>
+                    <td>@context.Pais</td>
+                    <td>@context.CiudadesCount</td>
+                    <td>
+                        @if (context.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Inactivo</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => VerDetalle(context)" @onclick:stopPropagation>
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => EditarDepartamento(context)" @onclick:stopPropagation>
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarEliminar(context)" @onclick:stopPropagation>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </RowTemplate>
+            </TableTemplate>
+        </div>
+    </div>
+
+    <Confirm @ref="_confirmDialog" 
+             Titulo="Confirmar eliminación" 
+             TextoBotonAceptar="Eliminar" 
+             TextoBotonCancelar="Cancelar"
+             BotonAceptarClase="danger" 
+             OnConfirm="EliminarDepartamento" />
+
+    <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+</div>
+
+@code {
+    private List<DepartamentoDto> Departamentos { get; set; } = new();
+    private List<PaisDto> Paises { get; set; } = new();
+    private PaginacionDto<DepartamentoDto>? Paginacion { get; set; }
+    private DepartamentoDto? _departamentoAEliminar;
+    private Confirm? _confirmDialog;
+    private Alert? _alertComponent;
+    private bool _cargando = false;
+
+    private string Busqueda { get; set; } = string.Empty;
+    private int PaginaActual { get; set; } = 1;
+    private int ElementosPorPagina { get; set; } = 10;
+    private int? PaisId { get; set; } = null;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "paisId")]
+    public int? PaisIdFiltro { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cargar el listado de países para el filtro
+        await CargarPaises();
+        
+        // Si viene un parámetro de país en la URL, lo aplicamos
+        if (PaisIdFiltro.HasValue)
+        {
+            PaisId = PaisIdFiltro;
+        }
+        
+        await CargarDepartamentos();
+    }
+
+    private async Task CargarPaises()
+    {
+        try
+        {
+            Paises = await PaisService.ObtenerTodosAsync();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar países: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+    }
+
+    private async Task CargarDepartamentos()
+    {
+        try
+        {
+            _cargando = true;
+            Paginacion = await DepartamentoService.ObtenerPaginadoAsync(PaginaActual, ElementosPorPagina, PaisId, Busqueda);
+            Departamentos = Paginacion.Lista ?? new List<DepartamentoDto>();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar departamentos: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task FiltrarPorPais()
+    {
+        PaginaActual = 1;
+        await CargarDepartamentos();
+    }
+
+    private async Task BuscarDepartamentos()
+    {
+        PaginaActual = 1;
+        await CargarDepartamentos();
+    }
+
+    private async Task LimpiarBusqueda()
+    {
+        Busqueda = string.Empty;
+        PaginaActual = 1;
+        await CargarDepartamentos();
+    }
+
+    private async Task CambiarPagina(int pagina)
+    {
+        PaginaActual = pagina;
+        await CargarDepartamentos();
+    }
+
+    private async Task CambiarElementosPorPagina()
+    {
+        PaginaActual = 1;
+        await CargarDepartamentos();
+    }
+
+    private void CrearNuevo()
+    {
+        if (PaisId.HasValue)
+        {
+            NavigationManager.NavigateTo($"/departamentos/crear?paisId={PaisId.Value}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/departamentos/crear");
+        }
+    }
+
+    private void VerDetalle(DepartamentoDto departamento)
+    {
+        NavigationManager.NavigateTo($"/departamentos/{departamento.Id}");
+    }
+
+    private void EditarDepartamento(DepartamentoDto departamento)
+    {
+        NavigationManager.NavigateTo($"/departamentos/editar/{departamento.Id}");
+    }
+
+    private async Task ConfirmarEliminar(DepartamentoDto departamento)
+    {
+        _departamentoAEliminar = departamento;
+        if (_confirmDialog != null)
+        {
+            await _confirmDialog.MostrarAsync($"¿Está seguro de eliminar el departamento '{departamento.Nombre}'? Esta acción no se puede deshacer.");
+        }
+    }
+
+    private async Task EliminarDepartamento()
+    {
+        if (_departamentoAEliminar == null) return;
+
+        try
+        {
+            var respuesta = await DepartamentoService.EliminarAsync(_departamentoAEliminar.Id);
+
+            if (respuesta.Exito)
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Departamento eliminado correctamente", respuesta.Mensaje, Alert.TipoAlerta.Success);
+                }
+                await CargarDepartamentos();
+            }
+            else
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al eliminar departamento", respuesta.Mensaje, Alert.TipoAlerta.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _departamentoAEliminar = null;
+        }
+    }
+}

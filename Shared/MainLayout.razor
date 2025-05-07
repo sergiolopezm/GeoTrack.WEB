@@ -1,0 +1,105 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <AuthorizeView>
+        <Authorized>
+            <SideNav />
+            <div class="main">
+                <NavMenu PageTitle="@_pageTitle" />
+                <div class="content px-4">
+                    @Body
+                </div>
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <div class="auth-layout">
+                <div class="auth-card">
+                    <div class="auth-logo text-center mb-4">
+                        <img src="/images/logo.png" alt="GeoTrack Logo" class="logo-img mb-3" />
+                        <h2>GeoTrack</h2>
+                    </div>
+                    @Body
+                </div>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private string _pageTitle = "GeoTrack";
+
+    protected override void OnInitialized()
+    {
+        // Obtener el título de la página según la ruta actual
+        var uri = new Uri(NavigationManager.Uri);
+        var path = uri.LocalPath.TrimEnd('/').Split('/').LastOrDefault();
+
+        _pageTitle = path switch
+        {
+            "" => "Inicio",
+            "dashboard" => "Dashboard",
+            "paises" => "Países",
+            "departamentos" => "Departamentos",
+            "ciudades" => "Ciudades",
+            "profile" => "Mi Perfil",
+            "register" => "Registrar Usuario",
+            _ => path != null ? char.ToUpper(path[0]) + path[1..] : "GeoTrack"
+        };
+    }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = null!;
+}
+
+<style>
+    .page {
+        position: relative;
+        display: flex;
+        width: 100%;
+        height: 100vh;
+    }
+
+    .main {
+        flex-grow: 1;
+        margin-left: 250px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+    }
+
+    .content {
+        flex-grow: 1;
+        padding: 1.5rem;
+    }
+
+    .auth-layout {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #f8f9fa;
+        width: 100%;
+    }
+
+    .auth-card {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .logo-img {
+        width: 80px;
+        height: 80px;
+    }
+
+    @media (max-width: 768px) {
+        .main {
+            margin-left: 70px;
+        }
+    }
+</style>

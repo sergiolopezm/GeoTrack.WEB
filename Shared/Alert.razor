@@ -1,0 +1,114 @@
+﻿@if (Visible)
+{
+    <div class="alert alert-@TipoCSS alert-dismissible fade show" role="alert">
+        @if (!string.IsNullOrEmpty(Titulo))
+        {
+            <h5 class="alert-heading">@Titulo</h5>
+        }
+        <p class="mb-0">@ChildContent</p>
+        @if (Desaparecible)
+        {
+            <button type="button" class="btn-close" @onclick="Ocultar" aria-label="Cerrar"></button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public string Titulo { get; set; } = string.Empty;
+
+    [Parameter]
+    public TipoAlerta Tipo { get; set; } = TipoAlerta.Info;
+
+    [Parameter]
+    public bool Desaparecible { get; set; } = true;
+
+    [Parameter]
+    public bool AutoDesaparecer { get; set; }
+
+    [Parameter]
+    public int TiempoDesaparicion { get; set; } = 5000;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private Timer? _timer;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && AutoDesaparecer && _timer == null)
+        {
+            _timer = new Timer(async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await Ocultar();
+                    StateHasChanged();
+                });
+            }, null, TiempoDesaparicion, Timeout.Infinite);
+        }
+    }
+
+    private async Task Ocultar()
+    {
+        Visible = false;
+        await VisibleChanged.InvokeAsync(false);
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    private string TipoCSS => Tipo switch
+    {
+        TipoAlerta.Success => "success",
+        TipoAlerta.Error => "danger",
+        TipoAlerta.Warning => "warning",
+        TipoAlerta.Info => "info",
+        _ => "info"
+    };
+
+    public async Task MostrarAsync(string contenido, string? titulo = null, TipoAlerta? tipo = null, bool? autoDesaparecer = null)
+    {
+        Titulo = titulo ?? Titulo;
+        Tipo = tipo ?? Tipo;
+        AutoDesaparecer = autoDesaparecer ?? AutoDesaparecer;
+        ChildContent = builder => builder.AddContent(0, contenido);
+        Visible = true;
+        await VisibleChanged.InvokeAsync(true);
+
+        _timer?.Dispose();
+        _timer = null;
+
+        if (AutoDesaparecer)
+        {
+            _timer = new Timer(async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await Ocultar();
+                    StateHasChanged();
+                });
+            }, null, TiempoDesaparicion, Timeout.Infinite);
+        }
+
+        StateHasChanged();
+    }
+
+    public enum TipoAlerta
+    {
+        Success,
+        Error,
+        Warning,
+        Info
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

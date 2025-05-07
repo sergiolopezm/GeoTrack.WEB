@@ -1,0 +1,224 @@
+﻿@page "/paises"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using Microsoft.AspNetCore.Authorization
+@inject IPaisService PaisService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Gestión de Países</h3>
+        <div>
+            <button class="btn btn-primary" @onclick="CrearNuevo">
+                <i class="bi bi-plus-circle me-1"></i> Crear País
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="input-group" style="width: 300px;">
+                        <input type="text" class="form-control" placeholder="Buscar..." @bind="Busqueda" @bind:event="oninput" @onkeyup="@(e => { if (e.Key == "Enter") BuscarPaises(); })" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="BuscarPaises">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Busqueda))
+                    {
+                        <button class="btn btn-link text-decoration-none" @onclick="LimpiarBusqueda">
+                            <i class="bi bi-x-circle"></i> Limpiar
+                        </button>
+                    }
+                </div>
+                <div>
+                    <select class="form-select" @bind="ElementosPorPagina" @onchange="CambiarElementosPorPagina">
+                        <option value="5">5 por página</option>
+                        <option value="10">10 por página</option>
+                        <option value="25">25 por página</option>
+                        <option value="50">50 por página</option>
+                    </select>
+                </div>
+            </div>
+
+            <TableTemplate TItem="PaisDto" Items="Paises" ColumnCount="6" ConPaginacion="true" Paginacion="Paginacion" 
+                          OnRowClick="VerDetalle" OnPageChanged="CambiarPagina" MensajeNoRegistros="No se encontraron países">
+                <TableHeader>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Código ISO</th>
+                    <th>Departamentos</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </TableHeader>
+                <RowTemplate>
+                    <td>@context.Id</td>
+                    <td>@context.Nombre</td>
+                    <td>@context.CodigoISO</td>
+                    <td>@context.DepartamentosCount</td>
+                    <td>
+                        @if (context.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Inactivo</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => VerDetalle(context)" @onclick:stopPropagation>
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => EditarPais(context)" @onclick:stopPropagation>
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarEliminar(context)" @onclick:stopPropagation>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </RowTemplate>
+            </TableTemplate>
+        </div>
+    </div>
+
+    <Confirm @ref="_confirmDialog" 
+             Titulo="Confirmar eliminación" 
+             TextoBotonAceptar="Eliminar" 
+             TextoBotonCancelar="Cancelar"
+             BotonAceptarClase="danger" 
+             OnConfirm="EliminarPais" />
+
+    <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+</div>
+
+@code {
+    private List<PaisDto> Paises { get; set; } = new();
+    private PaginacionDto<PaisDto>? Paginacion { get; set; }
+    private PaisDto? _paisAEliminar;
+    private Confirm? _confirmDialog;
+    private Alert? _alertComponent;
+    private bool _cargando = false;
+
+    private string Busqueda { get; set; } = string.Empty;
+    private int PaginaActual { get; set; } = 1;
+    private int ElementosPorPagina { get; set; } = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPaises();
+    }
+
+    private async Task CargarPaises()
+    {
+        try
+        {
+            _cargando = true;
+            Paginacion = await PaisService.ObtenerPaginadoAsync(PaginaActual, ElementosPorPagina, Busqueda);
+            Paises = Paginacion.Lista ?? new List<PaisDto>();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar países: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task BuscarPaises()
+    {
+        PaginaActual = 1;
+        await CargarPaises();
+    }
+
+    private async Task LimpiarBusqueda()
+    {
+        Busqueda = string.Empty;
+        PaginaActual = 1;
+        await CargarPaises();
+    }
+
+    private async Task CambiarPagina(int pagina)
+    {
+        PaginaActual = pagina;
+        await CargarPaises();
+    }
+
+    private async Task CambiarElementosPorPagina()
+    {
+        PaginaActual = 1;
+        await CargarPaises();
+    }
+
+    private void CrearNuevo()
+    {
+        NavigationManager.NavigateTo("/paises/crear");
+    }
+
+    private void VerDetalle(PaisDto pais)
+    {
+        NavigationManager.NavigateTo($"/paises/{pais.Id}");
+    }
+
+    private void EditarPais(PaisDto pais)
+    {
+        NavigationManager.NavigateTo($"/paises/editar/{pais.Id}");
+    }
+
+    private async Task ConfirmarEliminar(PaisDto pais)
+    {
+        _paisAEliminar = pais;
+        if (_confirmDialog != null)
+        {
+            await _confirmDialog.MostrarAsync($"¿Está seguro de eliminar el país '{pais.Nombre}'? Esta acción no se puede deshacer.");
+        }
+    }
+
+    private async Task EliminarPais()
+    {
+        if (_paisAEliminar == null) return;
+
+        try
+        {
+            var respuesta = await PaisService.EliminarAsync(_paisAEliminar.Id);
+
+            if (respuesta.Exito)
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "País eliminado correctamente", respuesta.Mensaje, Alert.TipoAlerta.Success);
+                }
+                await CargarPaises();
+            }
+            else
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al eliminar país", respuesta.Mensaje, Alert.TipoAlerta.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _paisAEliminar = null;
+        }
+    }
+}

@@ -1,0 +1,283 @@
+﻿@page "/departamentos/crear"
+@page "/departamentos/editar/{Id:int}"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using Microsoft.AspNetCore.Authorization
+@inject IDepartamentoService DepartamentoService
+@inject IPaisService PaisService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">@(_esEdicion ? "Editar" : "Crear") Departamento</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="departamentoModel" OnValidSubmit="GuardarDepartamento" class="row g-3">
+                <DataAnnotationsValidator />
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <InputText id="nombre" @bind-Value="departamentoModel.Nombre" class="form-control" placeholder="Ingrese el nombre del departamento" maxlength="100" />
+                        <ValidationMessage For="@(() => departamentoModel.Nombre)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="paisId" class="form-label">País <span class="text-danger">*</span></label>
+                        <InputSelect id="paisId" @bind-Value="departamentoModel.PaisId" class="form-select">
+                            <option value="0">Seleccione un país</option>
+                            @foreach (var pais in _paises)
+                            {
+                                <option value="@pais.Id">@pais.Nombre</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => departamentoModel.PaisId)" class="text-danger" />
+                    </div>
+                </div>
+
+                @if (_esEdicion)
+                {
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="estado" class="form-label">Estado</label>
+                            <div class="form-check form-switch">
+                                <InputCheckbox @bind-Value="departamentoModel.Activo" class="form-check-input" id="estado" />
+                                <label class="form-check-label" for="estado">
+                                    @(departamentoModel.Activo ? "Activo" : "Inactivo")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Ciudades asociadas</label>
+                            <div class="form-control bg-light" style="height: auto; min-height: 38px;">
+                                @if (_cargando)
+                                {
+                                    <div class="placeholder-glow">
+                                        <span class="placeholder col-6"></span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info rounded-pill">@departamentoModel.CiudadesCount</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="col-12 mt-4">
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary" @onclick="Cancelar">
+                            <i class="bi bi-x-circle me-1"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@_cargando">
+                            @if (_cargando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Guardando...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-save me-1"></i>
+                                <span>Guardar</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+
+            <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+        </div>
+    </div>
+
+    @if (_esEdicion && departamentoModel != null)
+    {
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Información adicional</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Fecha de creación:</strong></p>
+                        <p>@(departamentoModel.FechaCreacion.ToString("dd/MM/yyyy HH:mm"))</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Creado por:</strong></p>
+                        <p>@(departamentoModel.CreadoPor ?? "Sistema")</p>
+                    </div>
+                    @if (departamentoModel.FechaModificacion.HasValue)
+                    {
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Fecha de modificación:</strong></p>
+                            <p>@(departamentoModel.FechaModificacion.Value.ToString("dd/MM/yyyy HH:mm"))</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Modificado por:</strong></p>
+                            <p>@(departamentoModel.ModificadoPor ?? "Sistema")</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "paisId")]
+    public int? PaisIdPredeterminado { get; set; }
+
+    private DepartamentoDto departamentoModel = new();
+    private List<PaisDto> _paises = new();
+    private bool _esEdicion => Id > 0;
+    private bool _cargando = false;
+    private Alert? _alertComponent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPaises();
+
+        if (_esEdicion)
+        {
+            await CargarDepartamento();
+        }
+        else
+        {
+            // Valores por defecto para nuevo departamento
+            departamentoModel.Activo = true;
+            
+            // Si viene un país predeterminado
+            if (PaisIdPredeterminado.HasValue)
+            {
+                departamentoModel.PaisId = PaisIdPredeterminado.Value;
+            }
+        }
+    }
+
+    private async Task CargarPaises()
+    {
+        try
+        {
+            _cargando = true;
+            _paises = await PaisService.ObtenerTodosAsync();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar países: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task CargarDepartamento()
+    {
+        try
+        {
+            _cargando = true;
+            var departamento = await DepartamentoService.ObtenerPorIdAsync(Id);
+            if (departamento != null)
+            {
+                departamentoModel = departamento;
+            }
+            else
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync("No se encontró el departamento solicitado", "Error", Alert.TipoAlerta.Error);
+                }
+                NavigationManager.NavigateTo("/departamentos");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar departamento: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task GuardarDepartamento()
+    {
+        try
+        {
+            _cargando = true;
+            RespuestaDto respuesta;
+
+            if (_esEdicion)
+            {
+                respuesta = await DepartamentoService.ActualizarAsync(Id, departamentoModel);
+            }
+            else
+            {
+                respuesta = await DepartamentoService.CrearAsync(departamentoModel);
+            }
+
+            if (respuesta.Exito)
+            {
+                // Redirigir a la página del detalle del país si hay paisId
+                if (departamentoModel.PaisId > 0)
+                {
+                    NavigationManager.NavigateTo($"/paises/{departamentoModel.PaisId}");
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/departamentos");
+                }
+            }
+            else
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al guardar departamento", respuesta.Mensaje, Alert.TipoAlerta.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void Cancelar()
+    {
+        // Redirigir a la página del detalle del país si hay paisId
+        if (PaisIdPredeterminado.HasValue)
+        {
+            NavigationManager.NavigateTo($"/paises/{PaisIdPredeterminado.Value}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/departamentos");
+        }
+    }
+}

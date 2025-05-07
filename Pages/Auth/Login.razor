@@ -1,0 +1,116 @@
+﻿@page "/login"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Auth
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@attribute [AllowAnonymous]
+
+<div class="login-page">
+    <h2 class="mb-4 text-center">Iniciar Sesión</h2>
+
+    <EditForm Model="loginModel" OnValidSubmit="IniciarSesion" class="login-form">
+        <DataAnnotationsValidator />
+
+        <div class="mb-3">
+            <label for="username" class="form-label">Usuario</label>
+            <InputText id="username" @bind-Value="loginModel.NombreUsuario" class="form-control" placeholder="Ingrese su nombre de usuario" />
+            <ValidationMessage For="@(() => loginModel.NombreUsuario)" class="text-danger" />
+        </div>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">Contraseña</label>
+            <div class="input-group">
+                <InputText type="@(_mostrarContraseña ? "text" : "password")" id="password" @bind-Value="loginModel.Contraseña" class="form-control" placeholder="Ingrese su contraseña" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="ToggleMostrarContraseña">
+                    <i class="bi bi-eye@(_mostrarContraseña ? "-slash" : "")"></i>
+                </button>
+            </div>
+            <ValidationMessage For="@(() => loginModel.Contraseña)" class="text-danger" />
+        </div>
+
+        <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-primary" disabled="@_cargando">
+                @if (_cargando)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Iniciando sesión...</span>
+                }
+                else
+                {
+                    <span>Iniciar Sesión</span>
+                }
+            </button>
+        </div>
+    </EditForm>
+
+    @if (!string.IsNullOrEmpty(_mensajeError))
+    {
+        <div class="alert alert-danger mt-3">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            @_mensajeError
+        </div>
+    }
+</div>
+
+@code {
+    private UsuarioLoginDto loginModel = new();
+    private bool _cargando = false;
+    private bool _mostrarContraseña = false;
+    private string _mensajeError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Si el usuario ya está autenticado, redireccionar al dashboard
+        if (AuthService.EstaAutenticado())
+        {
+            NavigationManager.NavigateTo("/dashboard");
+        }
+    }
+
+    private void ToggleMostrarContraseña()
+    {
+        _mostrarContraseña = !_mostrarContraseña;
+    }
+
+    private async Task IniciarSesion()
+    {
+        _cargando = true;
+        _mensajeError = string.Empty;
+
+        try
+        {
+            // Obtener la IP del cliente (en un entorno real se haría de otra manera)
+            loginModel.Ip = "127.0.0.1";
+
+            var respuesta = await AuthService.LoginAsync(loginModel);
+
+            if (respuesta.Exito)
+            {
+                NavigationManager.NavigateTo("/dashboard");
+            }
+            else
+            {
+                _mensajeError = respuesta.Detalle ?? respuesta.Mensaje ?? "Error de autenticación";
+            }
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+}
+
+<style>
+    .login-page {
+        max-width: 100%;
+    }
+
+    .login-form {
+        margin-top: 1rem;
+    }
+</style>

@@ -1,0 +1,330 @@
+﻿@page "/ciudades"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using Microsoft.AspNetCore.Authorization
+@inject ICiudadService CiudadService
+@inject IPaisService PaisService
+@inject IDepartamentoService DepartamentoService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Gestión de Ciudades</h3>
+        <div>
+            <button class="btn btn-primary" @onclick="CrearNuevo">
+                <i class="bi bi-plus-circle me-1"></i> Crear Ciudad
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center">
+                <div class="d-flex align-items-center mb-2 mb-md-0">
+                    <div class="input-group" style="width: 300px;">
+                        <input type="text" class="form-control" placeholder="Buscar..." @bind="Busqueda" @bind:event="oninput" @onkeyup="@(e => { if (e.Key == "Enter") BuscarCiudades(); })" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="BuscarCiudades">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Busqueda))
+                    {
+                        <button class="btn btn-link text-decoration-none" @onclick="LimpiarBusqueda">
+                            <i class="bi bi-x-circle"></i> Limpiar
+                        </button>
+                    }
+                </div>
+                <div class="d-flex flex-wrap align-items-center">
+                    <div class="me-2 mb-2 mb-md-0">
+                        <select class="form-select" @bind="PaisId" @onchange="CambiarPais">
+                            <option value="@null">Todos los países</option>
+                            @foreach (var pais in Paises)
+                            {
+                                <option value="@pais.Id">@pais.Nombre</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="me-2 mb-2 mb-md-0">
+                        <select class="form-select" @bind="DepartamentoId" @onchange="FiltrarPorDepartamento">
+                            <option value="@null">Todos los departamentos</option>
+                            @foreach (var departamento in Departamentos)
+                            {
+                                <option value="@departamento.Id">@departamento.Nombre</option>
+                            }
+                        </select>
+                    </div>
+                    <select class="form-select" @bind="ElementosPorPagina" @onchange="CambiarElementosPorPagina">
+                        <option value="5">5 por página</option>
+                        <option value="10">10 por página</option>
+                        <option value="25">25 por página</option>
+                        <option value="50">50 por página</option>
+                    </select>
+                </div>
+            </div>
+
+            <TableTemplate TItem="CiudadDto" Items="Ciudades" ColumnCount="7" ConPaginacion="true" Paginacion="Paginacion" 
+                          OnRowClick="VerDetalle" OnPageChanged="CambiarPagina" MensajeNoRegistros="No se encontraron ciudades">
+                <TableHeader>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Departamento</th>
+                    <th>País</th>
+                    <th>Código Postal</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </TableHeader>
+                <RowTemplate>
+                    <td>@context.Id</td>
+                    <td>@context.Nombre</td>
+                    <td>@context.Departamento</td>
+                    <td>@context.Pais</td>
+                    <td>@(context.CodigoPostal ?? "N/A")</td>
+                    <td>
+                        @if (context.Activo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Inactivo</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => VerDetalle(context)" @onclick:stopPropagation>
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => EditarCiudad(context)" @onclick:stopPropagation>
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarEliminar(context)" @onclick:stopPropagation>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </RowTemplate>
+            </TableTemplate>
+        </div>
+    </div>
+
+    <Confirm @ref="_confirmDialog" 
+             Titulo="Confirmar eliminación" 
+             TextoBotonAceptar="Eliminar" 
+             TextoBotonCancelar="Cancelar"
+             BotonAceptarClase="danger" 
+             OnConfirm="EliminarCiudad" />
+
+    <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+</div>
+
+@code {
+    private List<CiudadDto> Ciudades { get; set; } = new();
+    private List<PaisDto> Paises { get; set; } = new();
+    private List<DepartamentoDto> Departamentos { get; set; } = new();
+    private PaginacionDto<CiudadDto>? Paginacion { get; set; }
+    private CiudadDto? _ciudadAEliminar;
+    private Confirm? _confirmDialog;
+    private Alert? _alertComponent;
+    private bool _cargando = false;
+
+    private string Busqueda { get; set; } = string.Empty;
+    private int PaginaActual { get; set; } = 1;
+    private int ElementosPorPagina { get; set; } = 10;
+    private int? PaisId { get; set; } = null;
+    private int? DepartamentoId { get; set; } = null;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "departamentoId")]
+    public int? DepartamentoIdFiltro { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cargar el listado de países para el filtro
+        await CargarPaises();
+        
+        // Si viene un departamento predeterminado
+        if (DepartamentoIdFiltro.HasValue)
+        {
+            DepartamentoId = DepartamentoIdFiltro;
+            
+            // Cargar el departamento para saber su país
+            var departamento = await DepartamentoService.ObtenerPorIdAsync(DepartamentoId.Value);
+            if (departamento != null && departamento.PaisId > 0)
+            {
+                PaisId = departamento.PaisId;
+                await CargarDepartamentosPorPais(PaisId.Value);
+            }
+        }
+        
+        await CargarCiudades();
+    }
+
+    private async Task CargarPaises()
+    {
+        try
+        {
+            Paises = await PaisService.ObtenerTodosAsync();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar países: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+    }
+
+    private async Task CargarDepartamentosPorPais(int paisId)
+    {
+        try
+        {
+            Departamentos = await DepartamentoService.ObtenerPorPaisIdAsync(paisId);
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar departamentos: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+    }
+
+    private async Task CargarCiudades()
+    {
+        try
+        {
+            _cargando = true;
+            Paginacion = await CiudadService.ObtenerPaginadoAsync(PaginaActual, ElementosPorPagina, DepartamentoId, Busqueda);
+            Ciudades = Paginacion.Lista ?? new List<CiudadDto>();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar ciudades: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private async Task CambiarPais()
+    {
+        DepartamentoId = null;
+        if (PaisId.HasValue)
+        {
+            await CargarDepartamentosPorPais(PaisId.Value);
+        }
+        else
+        {
+            Departamentos.Clear();
+        }
+        
+        PaginaActual = 1;
+        await CargarCiudades();
+    }
+
+    private async Task FiltrarPorDepartamento()
+    {
+        PaginaActual = 1;
+        await CargarCiudades();
+    }
+
+    private async Task BuscarCiudades()
+    {
+        PaginaActual = 1;
+        await CargarCiudades();
+    }
+
+    private async Task LimpiarBusqueda()
+    {
+        Busqueda = string.Empty;
+        PaginaActual = 1;
+        await CargarCiudades();
+    }
+
+    private async Task CambiarPagina(int pagina)
+    {
+        PaginaActual = pagina;
+        await CargarCiudades();
+    }
+
+    private async Task CambiarElementosPorPagina()
+    {
+        PaginaActual = 1;
+        await CargarCiudades();
+    }
+
+    private void CrearNuevo()
+    {
+        if (DepartamentoId.HasValue)
+        {
+            NavigationManager.NavigateTo($"/ciudades/crear?departamentoId={DepartamentoId.Value}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/ciudades/crear");
+        }
+    }
+
+    private void VerDetalle(CiudadDto ciudad)
+    {
+        NavigationManager.NavigateTo($"/ciudades/{ciudad.Id}");
+    }
+
+    private void EditarCiudad(CiudadDto ciudad)
+    {
+        NavigationManager.NavigateTo($"/ciudades/editar/{ciudad.Id}");
+    }
+
+    private async Task ConfirmarEliminar(CiudadDto ciudad)
+    {
+        _ciudadAEliminar = ciudad;
+        if (_confirmDialog != null)
+        {
+            await _confirmDialog.MostrarAsync($"¿Está seguro de eliminar la ciudad '{ciudad.Nombre}'? Esta acción no se puede deshacer.");
+        }
+    }
+
+    private async Task EliminarCiudad()
+    {
+        if (_ciudadAEliminar == null) return;
+
+        try
+        {
+            var respuesta = await CiudadService.EliminarAsync(_ciudadAEliminar.Id);
+
+            if (respuesta.Exito)
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Ciudad eliminada correctamente", respuesta.Mensaje, Alert.TipoAlerta.Success);
+                }
+                await CargarCiudades();
+            }
+            else
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al eliminar ciudad", respuesta.Mensaje, Alert.TipoAlerta.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _ciudadAEliminar = null;
+        }
+    }
+}

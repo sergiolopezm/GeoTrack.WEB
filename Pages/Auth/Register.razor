@@ -1,0 +1,171 @@
+﻿@page "/register"
+@using GeoTrack.WEB.Services.Interface
+@using Microsoft.AspNetCore.Authorization
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using GeoTrack.WEB.Models.Auth
+@inject IAuthService AuthService
+@inject IRolService RolService
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Roles = "Administrador")]
+
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Registrar nuevo usuario</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="registroModel" OnValidSubmit="RegistrarUsuario" class="row g-3">
+                <DataAnnotationsValidator />
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="nombreUsuario" class="form-label">Nombre de usuario <span class="text-danger">*</span></label>
+                        <InputText id="nombreUsuario" @bind-Value="registroModel.NombreUsuario" class="form-control" placeholder="Ingrese el nombre de usuario" />
+                        <ValidationMessage For="@(() => registroModel.NombreUsuario)" class="text-danger" />
+                        <small class="form-text text-muted">Mínimo 3 caracteres, solo letras, números y guiones bajos</small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="contraseña" class="form-label">Contraseña <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <InputText type="@(_mostrarContraseña ? "text" : "password")" id="contraseña" @bind-Value="registroModel.Contraseña" class="form-control" placeholder="Ingrese la contraseña" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ToggleMostrarContraseña">
+                                <i class="bi bi-eye@(_mostrarContraseña ? "-slash" : "")"></i>
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => registroModel.Contraseña)" class="text-danger" />
+                        <small class="form-text text-muted">Mínimo 6 caracteres, al menos una mayúscula, una minúscula y un número</small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <InputText id="nombre" @bind-Value="registroModel.Nombre" class="form-control" placeholder="Ingrese el nombre" />
+                        <ValidationMessage For="@(() => registroModel.Nombre)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="apellido" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <InputText id="apellido" @bind-Value="registroModel.Apellido" class="form-control" placeholder="Ingrese el apellido" />
+                        <ValidationMessage For="@(() => registroModel.Apellido)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                        <InputText id="email" @bind-Value="registroModel.Email" class="form-control" placeholder="Ingrese el email" />
+                        <ValidationMessage For="@(() => registroModel.Email)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="rol" class="form-label">Rol <span class="text-danger">*</span></label>
+                        <InputSelect id="rol" @bind-Value="registroModel.RolId" class="form-select">
+                            <option value="0">Seleccione un rol</option>
+                            @foreach (var rol in _roles)
+                            {
+                                <option value="@rol.Id">@rol.Nombre</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => registroModel.RolId)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="col-12 mt-4">
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary" @onclick="Cancelar">
+                            <i class="bi bi-x-circle me-1"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@_cargando">
+                            @if (_cargando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Registrando...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-person-plus me-1"></i>
+                                <span>Registrar Usuario</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+
+            <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private UsuarioRegistroDto registroModel = new();
+    private List<RolDto> _roles = new();
+    private bool _cargando = false;
+    private bool _mostrarContraseña = false;
+    private Alert? _alertComponent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _roles = await RolService.ObtenerTodosAsync();
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+                await _alertComponent.MostrarAsync($"Error al cargar roles: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+        }
+    }
+
+    private void ToggleMostrarContraseña()
+    {
+        _mostrarContraseña = !_mostrarContraseña;
+    }
+
+    private async Task RegistrarUsuario()
+    {
+        _cargando = true;
+
+        try
+        {
+            var respuesta = await AuthService.RegistrarUsuarioAsync(registroModel);
+
+            if (respuesta.Exito)
+            {
+                if (_alertComponent != null)
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Usuario registrado correctamente", respuesta.Mensaje, Alert.TipoAlerta.Success);
+                
+                // Limpiar el formulario
+                registroModel = new UsuarioRegistroDto();
+            }
+            else
+            {
+                if (_alertComponent != null)
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al registrar usuario", respuesta.Mensaje, Alert.TipoAlerta.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void Cancelar()
+    {
+        NavigationManager.NavigateTo("/dashboard");
+    }
+}

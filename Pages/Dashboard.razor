@@ -1,0 +1,343 @@
+﻿@page "/dashboard"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using Microsoft.AspNetCore.Authorization
+@inject IPaisService PaisService
+@inject IDepartamentoService DepartamentoService
+@inject ICiudadService CiudadService
+@attribute [Authorize]
+
+<div class="container-fluid">
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 dashboard-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="card-icon countries-icon">
+                        <i class="bi bi-globe"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="card-subtitle mb-1 text-muted">Total de Países</h6>
+                        <h2 class="card-title mb-0">
+                            @if (_cargando)
+                            {
+                                <div class="placeholder-glow">
+                                    <span class="placeholder col-4"></span>
+                                </div>
+                            }
+                            else
+                            {
+                                @_totalPaises
+                            }
+                        </h2>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0">
+                    <a href="/paises" class="btn btn-sm btn-outline-primary w-100">Ver Países</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 dashboard-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="card-icon departments-icon">
+                        <i class="bi bi-map"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="card-subtitle mb-1 text-muted">Total de Departamentos</h6>
+                        <h2 class="card-title mb-0">
+                            @if (_cargando)
+                            {
+                                <div class="placeholder-glow">
+                                    <span class="placeholder col-4"></span>
+                                </div>
+                            }
+                            else
+                            {
+                                @_totalDepartamentos
+                            }
+                        </h2>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0">
+                    <a href="/departamentos" class="btn btn-sm btn-outline-primary w-100">Ver Departamentos</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 dashboard-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="card-icon cities-icon">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="card-subtitle mb-1 text-muted">Total de Ciudades</h6>
+                        <h2 class="card-title mb-0">
+                            @if (_cargando)
+                            {
+                                <div class="placeholder-glow">
+                                    <span class="placeholder col-4"></span>
+                                </div>
+                            }
+                            else
+                            {
+                                @_totalCiudades
+                            }
+                        </h2>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0">
+                    <a href="/ciudades" class="btn btn-sm btn-outline-primary w-100">Ver Ciudades</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0">Países con más Departamentos</h5>
+                </div>
+                <div class="card-body">
+                    @if (_cargando)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (_paisesConMasDepartamentos.Any())
+                    {
+                        <div class="chart-container">
+                            <canvas id="paisesChart"></canvas>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-exclamation-circle display-4 d-block mb-3"></i>
+                            <p>No hay datos disponibles para mostrar</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0">Departamentos con más Ciudades</h5>
+                </div>
+                <div class="card-body">
+                    @if (_cargando)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (_departamentosConMasCiudades.Any())
+                    {
+                        <div class="chart-container">
+                            <canvas id="departamentosChart"></canvas>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-exclamation-circle display-4 d-block mb-3"></i>
+                            <p>No hay datos disponibles para mostrar</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _cargando = true;
+    private int _totalPaises = 0;
+    private int _totalDepartamentos = 0;
+    private int _totalCiudades = 0;
+    private List<PaisDto> _paisesConMasDepartamentos = new();
+    private List<DepartamentoDto> _departamentosConMasCiudades = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_cargando)
+        {
+            await CrearGraficos();
+        }
+    }
+
+    private async Task CargarDatos()
+    {
+        try
+        {
+            _cargando = true;
+
+            // Cargar datos de países
+            var paises = await PaisService.ObtenerTodosAsync();
+            _totalPaises = paises.Count;
+            _paisesConMasDepartamentos = paises
+                .OrderByDescending(p => p.DepartamentosCount)
+                .Take(5)
+                .ToList();
+
+            // Cargar datos de departamentos
+            var departamentos = await DepartamentoService.ObtenerTodosAsync();
+            _totalDepartamentos = departamentos.Count;
+            _departamentosConMasCiudades = departamentos
+                .OrderByDescending(d => d.CiudadesCount)
+                .Take(5)
+                .ToList();
+
+            // Cargar datos de ciudades
+            var ciudades = await CiudadService.ObtenerTodosAsync();
+            _totalCiudades = ciudades.Count;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error al cargar datos: {ex.Message}");
+        }
+        finally
+        {
+            _cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CrearGraficos()
+    {
+        await CrearGraficoPaises();
+        await CrearGraficoDepartamentos();
+    }
+
+    private async Task CrearGraficoPaises()
+    {
+        if (_paisesConMasDepartamentos.Any())
+        {
+            await JS.InvokeVoidAsync("crearGrafico",
+                "paisesChart",
+                "bar",
+                _paisesConMasDepartamentos.Select(p => p.Nombre).ToArray(),
+                _paisesConMasDepartamentos.Select(p => p.DepartamentosCount).ToArray(),
+                "Número de Departamentos",
+                "#3498db");
+        }
+    }
+
+    private async Task CrearGraficoDepartamentos()
+    {
+        if (_departamentosConMasCiudades.Any())
+        {
+            await JS.InvokeVoidAsync("crearGrafico",
+                "departamentosChart",
+                "bar",
+                _departamentosConMasCiudades.Select(d => d.Nombre).ToArray(),
+                _departamentosConMasCiudades.Select(d => d.CiudadesCount).ToArray(),
+                "Número de Ciudades",
+                "#e74c3c");
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
+}
+
+<style>
+    .dashboard-card {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+    }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+    .card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .card-icon i {
+            font-size: 28px;
+            color: white;
+        }
+
+    .countries-icon {
+        background-color: #3498db;
+    }
+
+    .departments-icon {
+        background-color: #2ecc71;
+    }
+
+    .cities-icon {
+        background-color: #e74c3c;
+    }
+
+    .chart-container {
+        height: 300px;
+    }
+</style>
+
+@inject IJSRuntime JS
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("eval", @"
+                window.crearGrafico = function(canvasId, tipo, etiquetas, datos, titulo, color) {
+                    var ctx = document.getElementById(canvasId).getContext('2d');
+                    var colores = datos.map(() => color);
+
+                    new Chart(ctx, {
+                        type: tipo,
+                        data: {
+                            labels: etiquetas,
+                            datasets: [{
+                                label: titulo,
+                                data: datos,
+                                backgroundColor: colores,
+                                borderColor: colores,
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            ");
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+}

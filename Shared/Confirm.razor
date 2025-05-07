@@ -1,0 +1,70 @@
+﻿@if (Visible)
+{
+    <div class="modal fade show" style="display: block; background-color: rgba(0, 0, 0, 0.5);" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Titulo</h5>
+                    <button type="button" class="btn-close" @onclick="OnCancelar" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p>@Mensaje</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="OnCancelar">@TextoBotonCancelar</button>
+                    <button type="button" class="btn btn-@BotonAceptarClase" @onclick="OnAceptar">@TextoBotonAceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public string Titulo { get; set; } = "Confirmar acción";
+
+    [Parameter]
+    public string Mensaje { get; set; } = "¿Está seguro de realizar esta acción?";
+
+    [Parameter]
+    public string TextoBotonAceptar { get; set; } = "Aceptar";
+
+    [Parameter]
+    public string TextoBotonCancelar { get; set; } = "Cancelar";
+
+    [Parameter]
+    public string BotonAceptarClase { get; set; } = "primary";
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private async Task OnAceptar()
+    {
+        await VisibleChanged.InvokeAsync(false);
+        await OnConfirm.InvokeAsync();
+    }
+
+    private async Task OnCancelar()
+    {
+        await VisibleChanged.InvokeAsync(false);
+        await OnCancel.InvokeAsync();
+    }
+
+    public async Task MostrarAsync(string mensaje, string titulo = "Confirmar acción")
+    {
+        Mensaje = mensaje;
+        Titulo = titulo;
+        Visible = true;
+        await VisibleChanged.InvokeAsync(true);
+        StateHasChanged();
+    }
+}

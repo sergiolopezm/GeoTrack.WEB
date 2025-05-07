@@ -1,0 +1,232 @@
+﻿@page "/ciudades/{Id:int}"
+@using GeoTrack.WEB.Services.Interface
+@using GeoTrack.WEB.Models.Ubicacion
+@using GeoTrack.WEB.Shared
+@using GeoTrack.WEB.Models
+@using Microsoft.AspNetCore.Authorization
+@inject ICiudadService CiudadService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<div class="container-fluid">
+    @if (_cargando)
+    {
+        <Loading Visible="true" Mensaje="Cargando información de la ciudad..." />
+    }
+    else if (_ciudad != null)
+    {
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/ciudades">Ciudades</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">@_ciudad.Nombre</li>
+                    </ol>
+                </nav>
+                <h3 class="mt-2">@_ciudad.Nombre</h3>
+                <p class="text-muted mb-0">
+                    Departamento: <a href="/departamentos/@_ciudad.DepartamentoId">@_ciudad.Departamento</a>
+                </p>
+                <p class="text-muted">
+                    País: <a href="/paises/@_ciudad.PaisId">@_ciudad.Pais</a>
+                </p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary me-2" @onclick="() => EditarCiudad(_ciudad.Id)">
+                    <i class="bi bi-pencil me-1"></i> Editar
+                </button>
+                <button class="btn btn-outline-danger" @onclick="() => ConfirmarEliminar(_ciudad)">
+                    <i class="bi bi-trash me-1"></i> Eliminar
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Información general</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Nombre</h6>
+                                    <p class="mb-0">@_ciudad.Nombre</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Código Postal</h6>
+                                    <p class="mb-0">@(_ciudad.CodigoPostal ?? "No especificado")</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Departamento</h6>
+                                    <p class="mb-0">@_ciudad.Departamento</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">País</h6>
+                                    <p class="mb-0">@_ciudad.Pais</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Estado</h6>
+                                    <p class="mb-0">
+                                        @if (_ciudad.Activo)
+                                        {
+                                            <span class="badge bg-success">Activo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Inactivo</span>
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Información de auditoría</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Fecha de creación</h6>
+                                    <p class="mb-0">@_ciudad.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Creado por</h6>
+                                    <p class="mb-0">@(_ciudad.CreadoPor ?? "Sistema")</p>
+                                </div>
+                            </div>
+                            @if (_ciudad.FechaModificacion.HasValue)
+                            {
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <h6 class="text-muted">Fecha de modificación</h6>
+                                        <p class="mb-0">@_ciudad.FechaModificacion.Value.ToString("dd/MM/yyyy HH:mm")</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <h6 class="text-muted">Modificado por</h6>
+                                        <p class="mb-0">@(_ciudad.ModificadoPor ?? "Sistema")</p>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            La ciudad solicitada no existe o ha sido eliminada.
+        </div>
+    }
+
+    <Confirm @ref="_confirmDialog" 
+             Titulo="Confirmar eliminación" 
+             TextoBotonAceptar="Eliminar" 
+             TextoBotonCancelar="Cancelar"
+             BotonAceptarClase="danger" 
+             OnConfirm="EliminarCiudad" />
+
+    <Alert @ref="_alertComponent" Desaparecible="true" AutoDesaparecer="true" TiempoDesaparicion="5000" />
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private CiudadDto? _ciudad;
+    private bool _cargando = true;
+    private Confirm? _confirmDialog;
+    private Alert? _alertComponent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCiudad();
+    }
+
+    private async Task CargarCiudad()
+    {
+        try
+        {
+            _cargando = true;
+            _ciudad = await CiudadService.ObtenerPorIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error al cargar información de la ciudad: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void EditarCiudad(int id)
+    {
+        NavigationManager.NavigateTo($"/ciudades/editar/{id}");
+    }
+
+    private async Task ConfirmarEliminar(CiudadDto ciudad)
+    {
+        if (_confirmDialog != null)
+        {
+            await _confirmDialog.MostrarAsync($"¿Está seguro de eliminar la ciudad '{ciudad.Nombre}'? Esta acción no se puede deshacer.");
+        }
+    }
+
+    private async Task EliminarCiudad()
+    {
+        try
+        {
+            var respuesta = await CiudadService.EliminarAsync(Id);
+
+            if (respuesta.Exito)
+            {
+                if (_ciudad?.DepartamentoId > 0)
+                {
+                    NavigationManager.NavigateTo($"/departamentos/{_ciudad.DepartamentoId}");
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/ciudades");
+                }
+            }
+            else
+            {
+                if (_alertComponent != null)
+                {
+                    await _alertComponent.MostrarAsync(respuesta.Detalle ?? "Error al eliminar ciudad", respuesta.Mensaje, Alert.TipoAlerta.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_alertComponent != null)
+            {
+                await _alertComponent.MostrarAsync($"Error: {ex.Message}", "Error", Alert.TipoAlerta.Error);
+            }
+        }
+    }
+}
