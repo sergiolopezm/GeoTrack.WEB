@@ -5,16 +5,40 @@ using GeoTrack.WEB.Services.Interface;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.Logging;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // ────────────────────────────────────────────────────────────
-// 1)  URL base de la API
+// 1)  Cargar configuración y verificar URL base de la API
 // ────────────────────────────────────────────────────────────
-var apiUrl = builder.Configuration.GetValue<string>("ApiSettings:BaseUrl")
-            ?? "https://localhost:7243/api/";
+var apiUrl = builder.Configuration.GetValue<string>("ApiSettings:BaseUrl");
+if (string.IsNullOrEmpty(apiUrl))
+{
+    // Si no se encuentra la configuración, usar valor predeterminado
+    apiUrl = "https://localhost:7243/api/";
+    Console.WriteLine($"⚠️ No se encontró configuración de API. Usando valor predeterminado: {apiUrl}");
+}
+else
+{
+    Console.WriteLine($"✅ URL de API cargada de configuración: {apiUrl}");
+}
+
+// Asegurarse que la URL termine con "/"
+if (!apiUrl.EndsWith("/"))
+{
+    apiUrl += "/";
+}
+
+// Configurar logging (método correcto para Blazor WebAssembly)
+builder.Services.AddLogging(logging =>
+{
+    logging.SetMinimumLevel(LogLevel.Information);
+    // En Blazor WebAssembly solo podemos usar ciertos proveedores
+    // No usar AddConfiguration aquí, no es compatible con WebAssembly
+});
 
 // ────────────────────────────────────────────────────────────
 // 2)  Servicios auxiliares y autenticación
@@ -26,34 +50,41 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 builder.Services.AddAuthorizationCore();
 
 // ────────────────────────────────────────────────────────────
-// 3)  Interceptor HTTP (transient!) y clientes tipados
+// 3)  Interceptor HTTP (transient!) y clientes tipados
 // ────────────────────────────────────────────────────────────
 builder.Services.AddTransient<HttpInterceptor>();
 
-builder.Services.AddHttpClient<IAuthService, ApiAuthService>(c =>
+// Registrar un delegado de configuración de HttpClient que se usará en todos los clientes
+Action<HttpClient> configureClient = (client) =>
 {
-    c.BaseAddress = new Uri(apiUrl);
-}).AddHttpMessageHandler<HttpInterceptor>();
+    client.BaseAddress = new Uri(apiUrl);
+    // Agregar cualquier configuración común aquí si es necesario
+};
 
-builder.Services.AddHttpClient<IPaisService, ApiPaisService>(c =>
-{
-    c.BaseAddress = new Uri(apiUrl);
-}).AddHttpMessageHandler<HttpInterceptor>();
+// Configurar clientes tipados con el delegado común
+builder.Services.AddHttpClient<IAuthService, ApiAuthService>(configureClient)
+                .AddHttpMessageHandler<HttpInterceptor>();
 
-builder.Services.AddHttpClient<IDepartamentoService, ApiDepartamentoService>(c =>
-{
-    c.BaseAddress = new Uri(apiUrl);
-}).AddHttpMessageHandler<HttpInterceptor>();
+builder.Services.AddHttpClient<IPaisService, ApiPaisService>(configureClient)
+                .AddHttpMessageHandler<HttpInterceptor>();
 
-builder.Services.AddHttpClient<ICiudadService, ApiCiudadService>(c =>
-{
-    c.BaseAddress = new Uri(apiUrl);
-}).AddHttpMessageHandler<HttpInterceptor>();
+builder.Services.AddHttpClient<IDepartamentoService, ApiDepartamentoService>(configureClient)
+                .AddHttpMessageHandler<HttpInterceptor>();
 
-builder.Services.AddHttpClient<IRolService, ApiRolService>(c =>
-{
-    c.BaseAddress = new Uri(apiUrl);
-}).AddHttpMessageHandler<HttpInterceptor>();
+builder.Services.AddHttpClient<ICiudadService, ApiCiudadService>(configureClient)
+                .AddHttpMessageHandler<HttpInterceptor>();
+
+builder.Services.AddHttpClient<IRolService, ApiRolService>(configureClient)
+                .AddHttpMessageHandler<HttpInterceptor>();
+
+// Registrar la URL de la API como un servicio para usarla en cualquier parte de la aplicación
+builder.Services.AddSingleton(new ApiUrlConfig { BaseUrl = apiUrl });
 
 // ────────────────────────────────────────────────────────────
 await builder.Build().RunAsync();
+
+// Clase auxiliar para inyectar la URL base
+public class ApiUrlConfig
+{
+    public string BaseUrl { get; set; } = string.Empty;
+}

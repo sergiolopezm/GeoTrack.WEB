@@ -25,18 +25,39 @@ namespace GeoTrack.WEB.Helpers
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
+    HttpRequestMessage request,
+    CancellationToken cancellationToken)
         {
-            await AddHeadersAsync(request);
-            var response = await base.SendAsync(request, cancellationToken);
-
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            try
             {
-                _nav.NavigateTo("/auth/login", forceLoad: true);
-            }
+                await AddHeadersAsync(request);
 
-            return response;
+                Console.WriteLine($"Enviando solicitud a: {request.RequestUri}");
+                Console.WriteLine($"Método: {request.Method}");
+                Console.WriteLine($"Headers: {string.Join(", ", request.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}"))}");
+
+                var response = await base.SendAsync(request, cancellationToken);
+
+                Console.WriteLine($"Respuesta recibida: {response.StatusCode}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Error: {content}");
+                }
+
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    _nav.NavigateTo("/auth/login", forceLoad: true);
+                }
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error en HttpInterceptor: {ex.Message}");
+                throw; // Re-lanzar para mantener la cadena de error
+            }
         }
 
         // ------------------------------------------------------

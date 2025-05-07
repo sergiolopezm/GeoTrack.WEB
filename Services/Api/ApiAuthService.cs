@@ -41,38 +41,62 @@ namespace GeoTrack.WEB.Services.Api
             try
             {
                 // Agregar headers para acceso a la API
-                _httpClient.DefaultRequestHeaders.Clear();
-                _httpClient.DefaultRequestHeaders.Add("Sitio", "GeoTrack");
-                _httpClient.DefaultRequestHeaders.Add("Clave", "GeoTrack2025");
+                //_httpClient.DefaultRequestHeaders.Clear();
+                //_httpClient.DefaultRequestHeaders.Add("Sitio", "GeoTrack");
+                //_httpClient.DefaultRequestHeaders.Add("Clave", "GeoTrack2025");
+
+                // Agregar headers para ayudar con CORS
+                _httpClient.DefaultRequestHeaders.Add("Origin", "https://localhost:7295");
+                _httpClient.DefaultRequestHeaders.Add("Access-Control-Request-Method", "POST");
+                _httpClient.DefaultRequestHeaders.Add("Access-Control-Request-Headers", "content-type");
 
                 var content = new StringContent(JsonSerializer.Serialize(loginDto), Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("auth/login", content);
+
+                // Registrar información de la solicitud
+                _logger.LogInformation($"Enviando solicitud login a: {_httpClient.BaseAddress}Auth/login");
+
+                // Usar HttpCompletionOption.ResponseHeadersRead para obtener la respuesta más rápido
+                var response = await _httpClient.PostAsync("Auth/login", content, HttpCompletionOption.ResponseHeadersRead);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var resultado = await response.Content.ReadFromJsonAsync<RespuestaDto>(_jsonOptions);
-
-                    if (resultado != null && resultado.Exito && resultado.Resultado != null)
+                    try
                     {
-                        var authData = JsonSerializer.Deserialize<AuthResultData>(
-                            resultado.Resultado.ToString() ?? "",
-                            _jsonOptions);
+                        // Primero lee el contenido como string para depuración
+                        var jsonContent = await response.Content.ReadAsStringAsync();
+                        _logger.LogInformation("Respuesta JSON: {Json}", jsonContent);
 
-                        if (authData != null)
+                        var resultado = await response.Content.ReadFromJsonAsync<RespuestaDto>(_jsonOptions);
+
+                        if (resultado != null && resultado.Exito && resultado.Resultado != null)
                         {
-                            // Guardar token y datos de usuario en localStorage
-                            await _localStorage.SetItemAsync("authToken", authData.Token);
-                            await _localStorage.SetItemAsync("usuarioId", authData.Usuario.Id);
-                            await _localStorage.SetItemAsync("usuario", JsonSerializer.Serialize(authData.Usuario));
+                            // Usar JsonSerializer directamente con el objeto resultado.Resultado
+                            if (resultado.Resultado is JsonElement jsonElement)
+                            {
+                                var authData = jsonElement.Deserialize<AuthResultData>(_jsonOptions);
 
-                            // Notificar al estado de autenticación
-                            ((JwtAuthenticationStateProvider)_authStateProvider).NotificarLogin(authData.Token);
+                                if (authData != null)
+                                {
+                                    // Guardar token y datos de usuario en localStorage
+                                    await _localStorage.SetItemAsync("authToken", authData.Token);
+                                    await _localStorage.SetItemAsync("usuarioId", authData.Usuario.Id);
+                                    await _localStorage.SetItemAsync("usuario", JsonSerializer.Serialize(authData.Usuario));
 
-                            return resultado;
+                                    // Notificar al estado de autenticación
+                                    ((JwtAuthenticationStateProvider)_authStateProvider).NotificarLogin(authData.Token);
+
+                                    return resultado;
+                                }
+                            }
                         }
-                    }
 
-                    return resultado ?? RespuestaDto.ErrorPorDefecto();
+                        return resultado ?? RespuestaDto.ErrorPorDefecto();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error procesando respuesta exitosa: {Message}", ex.Message);
+                        return RespuestaDto.Desde(ex);
+                    }
                 }
                 else
                 {
@@ -87,7 +111,8 @@ namespace GeoTrack.WEB.Services.Api
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error en login");
+                _logger.LogError(ex, "Error en login: {Message}, StackTrace: {StackTrace}",
+                    ex.Message, ex.StackTrace);
                 return RespuestaDto.Desde(ex);
             }
         }
@@ -114,7 +139,7 @@ namespace GeoTrack.WEB.Services.Api
                 }
 
                 var content = new StringContent(JsonSerializer.Serialize(registroDto), Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("auth/registro", content);
+                var response = await _httpClient.PostAsync("Auth/registro", content);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -165,7 +190,7 @@ namespace GeoTrack.WEB.Services.Api
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
                 _httpClient.DefaultRequestHeaders.Add("UsuarioId", usuarioId);
 
-                var response = await _httpClient.GetAsync("auth/perfil");
+                var response = await _httpClient.GetAsync("Auth/perfil");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -223,7 +248,7 @@ namespace GeoTrack.WEB.Services.Api
                     _httpClient.DefaultRequestHeaders.Add("UsuarioId", usuarioId);
 
                     // Llamar al endpoint de logout
-                    var response = await _httpClient.PostAsync("auth/logout", null);
+                    var response = await _httpClient.PostAsync("Auth/logout", null);
 
                     // Independientemente del resultado, limpiar el almacenamiento local
                     await _localStorage.RemoveItemAsync("authToken");

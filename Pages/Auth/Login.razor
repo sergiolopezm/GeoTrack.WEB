@@ -51,6 +51,15 @@
             @_mensajeError
         </div>
     }
+
+    // Agrega esto al HTML después del mensaje de error existente:
+    @if (!string.IsNullOrEmpty(_errorDetallado))
+    {
+        <div class="alert alert-secondary mt-2 small">
+            <strong>Información técnica:</strong>
+            <pre style="max-height: 150px; overflow: auto;">@_errorDetallado</pre>
+        </div>
+    }
 </div>
 
 @code {
@@ -73,14 +82,17 @@
         _mostrarContraseña = !_mostrarContraseña;
     }
 
+    // Agrega este campo para mostrar los errores de red
+    private string _errorDetallado = string.Empty;
+
     private async Task IniciarSesion()
     {
         _cargando = true;
         _mensajeError = string.Empty;
+        _errorDetallado = string.Empty;
 
         try
         {
-            // Obtener la IP del cliente (en un entorno real se haría de otra manera)
             loginModel.Ip = "127.0.0.1";
 
             var respuesta = await AuthService.LoginAsync(loginModel);
@@ -97,12 +109,17 @@
         catch (Exception ex)
         {
             _mensajeError = $"Error: {ex.Message}";
+            _errorDetallado = $"Detalles: {ex.StackTrace?.Substring(0, Math.Min(ex.StackTrace?.Length ?? 0, 500))}";
+            Console.WriteLine($"Error login: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
         }
         finally
         {
             _cargando = false;
+            StateHasChanged(); // Forzar actualización de la UI
         }
     }
+
 }
 
 <style>
